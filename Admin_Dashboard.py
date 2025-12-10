@@ -43,6 +43,8 @@ def admin_page():
     st.markdown(f"Welcome, **{st.session_state.get('username', 'Admin')}**")
     
     st.sidebar.title("Control Panel")
+
+    
     
     # === زر تسجيل الخروج ===
     if st.sidebar.button("🚪 Logout"):
