@@ -1,5 +1,5 @@
 import streamlit as st
-from team5 import register_user, login_check
+import team5
 import base64
 import sys
 import os
@@ -51,7 +51,7 @@ if choice == "Login":
     password = st.text_input("Password", type="password")
 
     if st.button(":orange[*Login*]"):
-        user = login_check(username, password)
+        user = team5.login_check(username, password)
         if user:
             # 1. حفظ حالة المستخدم في الجلسة (Session)
             st.session_state['logged_in'] = True
@@ -81,7 +81,7 @@ else:
     password = st.text_input("New Password", type="password")
 
     if st.button(":red[*Sign Up*]"):
-        if register_user(username, password, role='user'): # الافتراضي مستخدم عادي
+        if team5.register_user(username, password, role='user'): # الافتراضي مستخدم عادي
             st.success("Account created successfully! Please Login now.")
         else:
             st.error("Username already exists. Try another one.")
