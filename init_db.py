@@ -92,9 +92,8 @@ def create_database():
     )
     """)
 
+    
     conn.commit()
     conn.close()
     print("DATABASE CREATED SUCCESSFULLY!")
-
-
 create_database()
