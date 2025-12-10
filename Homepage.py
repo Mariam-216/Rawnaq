@@ -1,5 +1,5 @@
 import streamlit as st
-import team5 # Import the updated db module
+import team5
 import sqlite3 
 import base64
 import time
@@ -8,7 +8,6 @@ import time
 def img_to_base64(image_path):
     """Converts a local image file to a Base64 string for direct embedding in HTML/CSS."""
     try:
-        # Determine MIME type
         if image_path.lower().endswith(('.png', '.gif')):
             mime_type = 'image/png'
         elif image_path.lower().endswith(('.jpeg', '.jpg')):
@@ -66,8 +65,7 @@ def set_bg_image(image_path):
             box-shadow: 0 6px 18px rgba(0,0,0,0.6);
         }}
 
-        h1, h2, h3, h4, p, span, div, .stSelectbox label, .stSlider label {{
-            color: white; /* Ensure text is visible on dark background */
+        h1, h2, h3, h4, p, span, div {{
             text-shadow: 2px 2px 4px #000000;
         }}
         </style>
@@ -77,27 +75,27 @@ def set_bg_image(image_path):
         st.error(f"⚠️ صورة الخلفية غير موجودة في المسار: {image_path}")
 
 # حط هنا مسار الصورة اللي انت عاوزها تكون خلفية
-set_bg_image('images/bg2.jpg') # Ensure this path is correct
+set_bg_image('images/bg2.jpg')
 # ==========================================
-
 def apply_custom_style():
-    # You can add more global styles here if needed
     st.markdown("""
         <style>
-        /* Placeholder for additional global styles */
+        /* General styling */
         </style>
     """, unsafe_allow_html=True)
 
 apply_custom_style()
 # ==========================================
 
-# NOTE: This block assumes 'init_db.py' exists and sets up the tables properly.
-# The `db` module already includes the table creation logic.
 def init_data_fix():
+    try:
+        import init_db
+    except:
+        pass
+
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
     
-    # 1. Ensure categories exist
     try:
         cursor.execute("INSERT OR IGNORE INTO categories (id, name) VALUES (1, 'Men')")
         cursor.execute("INSERT OR IGNORE INTO categories (id, name) VALUES (2, 'Women')")
@@ -105,14 +103,12 @@ def init_data_fix():
     except:
         pass
 
-    # 2. Ensure initial products exist
     existing_products = team5.get_all_products()
-    if not existing_products or len(existing_products) < 4:
-        # NOTE: Added a 'stock' column assumption here.
+    if not existing_products:
         team5.add_product("Classic Shirt", 1, "M", "White", 450.0, 10, "images/shirt.jpg") 
         team5.add_product("Slim Jeans", 1, "32", "Blue", 600.0, 15, "images/jeans.jpg")
-        team5.add_product("Summer Dress", 2, "S", "Red", 750.0, 8, "images/dress.jpeg")
-        team5.add_product("Brown Dress", 2, "OneSize", "Brown", 950.0, 20, "images/dress2.jpg")
+        team5.add_product("Summer Dress", 2, "S", "Red", 750.0, 8, "images/dresss.jpg")
+        team5.add_product("Brown Dress", 2, "OneSize", "Brown", 950.0, 20, "images/handbag (1).jpg")
 
     conn.close()
 
@@ -129,19 +125,14 @@ if 'selected_product' not in st.session_state:
     st.session_state['selected_product'] = None
 if 'user_id' not in st.session_state:
     st.session_state['user_id'] = None 
-if 'checkout_status' not in st.session_state: # <-- Check status for staged checkout
+if 'checkout_status' not in st.session_state: 
     st.session_state['checkout_status'] = 'idle'
 
 
 def go_to(page_name):
     st.session_state['page'] = page_name
     st.rerun()
-if 'checkout_status' not in st.session_state:
-    st.session_state['checkout_status'] = 'idle'
 
-# --- ضيف السطرين دول تحت السطر اللي فوق ده علطول ---
-if 'my_orders' not in st.session_state:
-    st.session_state['my_orders'] = []
 # --- Login/Logout Functions ---
 def logout_user():
     st.session_state['user_id'] = None 
@@ -156,8 +147,8 @@ def login_user_simulated(user_id=1):
 # ==========================================
 
 def render_home():
-    st.markdown("<h1 style='text-align: center; color: white;'> RAWNAQ BRAND </h1>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align: center; color: white;'>Style for Men & Women</h4>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #000000;'> RAWNAQ BRAND </h1>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: center;'>Style for Men & Women</h4>", unsafe_allow_html=True)
     st.divider()
 
     col1, col2 = st.columns(2)
@@ -171,7 +162,7 @@ def render_home():
             go_to('category')
 
     st.write("")
-   
+    
 def render_category():
     # 1. زرار الرجوع والعنوان
     cat_id = st.session_state['selected_cat_id']
@@ -183,32 +174,32 @@ def render_category():
     st.title(f"{cat_name} Section")
 
     # 2. جلب المنتجات
-    all_products = team5.get_all_products()
+    # Get products fresh every time to reflect stock updates
+    all_products = team5.get_all_products() 
     base_products = [p for p in all_products if p['category_id'] == cat_id]
 
     if not base_products:
         st.warning("لا توجد منتجات حالياً!")
         return
 
-    # ==========================================
     # 3. نظام الفلتر (القائمة المنسدلة + السعر)
-    # ==========================================
     with st.expander("🔍 Filter & Search (تصفية المنتجات)", expanded=False):
         c_filter1, c_filter2 = st.columns(2)
         
         with c_filter1:
-            # --- التعديل هنا: قائمة منسدلة بدل الكتابة ---
             filter_options = ["الكل", "Shirt", "Jeans", "Dress", "T-shirt", "Shoes"]
-            selected_type = st.selectbox("Select product type:", filter_options)
+            selected_type = st.selectbox("اselect product :", filter_options)
 
         with c_filter2:
             # فلتر السعر (سلايدر)
             prices = [p['salary'] for p in base_products]
             if prices:
                 min_p, max_p = int(min(prices)), int(max(prices))
-                # Handle case where min and max are the same
+                # Adjust range if min and max are the same
                 if min_p == max_p: 
-                    min_p = 0
+                    min_p = max(0, min_p - 100)
+                    max_p = max_p + 100
+                    
                 price_range = st.slider(" Price Range (EGP)", min_p, max_p, (min_p, max_p))
             else:
                 price_range = (0, 10000)
@@ -227,9 +218,7 @@ def render_category():
             
         final_products.append(p)
 
-    # ==========================================
     # 5. عرض المنتجات النهائية
-    # ==========================================
     if not final_products:
         st.info(f"لا توجد منتجات من نوع '{selected_type}' في هذا النطاق السعري.")
     else:
@@ -249,7 +238,7 @@ def render_category():
                 st.subheader(product['name'])
                 st.write(f"**{product['salary']} EGP**")
                 
-                # Use .get() for safer access
+                # Fetch stock dynamically
                 stock = product.get('stock', 0)
                 st.write(f"**Stock:** {stock}")
 
@@ -257,41 +246,31 @@ def render_category():
                     if st.button("Add 🛒", key=f"add_{product['id']}", use_container_width=True):
                         user_id = st.session_state.get('user_id') 
                         if user_id:
-                            # Use product['id'] as product_id for the database
                             team5.add_to_cart(user_id, product['id'], 1)
                             st.toast("تمت الإضافة للسلة! 🛒")
-                            st.rerun()
                         else:
                             st.warning("يجب تسجيل الدخول أولاً")
-                            st.switch_page("Register.py")
-                # --- Corrected Code Snippet for render_category ---
-# ... inside the loop over final_products ...
+                            time.sleep(3)
+                            st.switch_page("pages/Register.py")
                 else:
-                    st.button(
-                        "Sold Out", 
-                        disabled=True, 
-                        use_container_width=True,
-                        # FIX: Add a unique key here
-                        key=f"soldout_{product['id']}" 
-                    )
-# ... rest of the loop ...
+                    st.button("Sold Out", disabled=True, use_container_width=True)
 
                 if st.button("Details 📄", key=f"view_{product['id']}", use_container_width=True):
                     st.session_state['selected_product'] = product
                     go_to('product')
 
                 st.markdown("</div>", unsafe_allow_html=True)
+                
 def render_product():
     if st.button("⬅️ Back"):
         go_to('category')
 
     product = st.session_state['selected_product']
     if not product:
-        st.warning("Product details not found.")
         return
 
-    # In a real app, you would re-fetch the product here to ensure stock is up to date
-    # product = db.get_product_by_id(product['id']) 
+    # Use data from session state for simplicity
+    stock = product.get('stock', 0) 
 
     c1, c2 = st.columns([1, 1])
     with c1:
@@ -308,11 +287,8 @@ def render_product():
         st.title(product['name'])
         st.subheader(f"{product['salary']} EGP")
         
-        # --- Simplified Stock Display ---
-        stock = product.get('stock', 0)
         st.write(f"**Stock:** {stock}")
         st.divider()
-        # --------------------------
 
         desc = f"""
         - Color: {product['color']}
@@ -324,7 +300,7 @@ def render_product():
         size = st.selectbox("Choose Size", ["S", "M", "L", "XL", "XXL"])
         
         # Limit quantity to available stock
-        max_qty = int(stock) if isinstance(stock, int) and stock > 0 else 1
+        max_qty = int(stock) if isinstance(stock, int) else 10
         qty = st.number_input("Quantity", 1, max_qty, 1)
 
         if stock and stock > 0:
@@ -339,60 +315,48 @@ def render_product():
         else:
             st.button("Sold Out", disabled=True, use_container_width=True)
 
+
 def render_cart():
     user_id = st.session_state.get('user_id')
-    st.title("🛒 Your Cart")
 
+    st.title("🛒 Your Cart")
+    
     # --- 1. HANDLE POST-CHECKOUT SUCCESS ---
     if st.session_state['checkout_status'] == 'success':
         st.balloons()
         st.success("🎉 Payment successful! Your order has been placed!")
-        time.sleep(3)
+        
+        time.sleep(3) 
+        
+        # After delay, redirect to home page and reset status
         st.session_state['checkout_status'] = 'idle'
         go_to('home')
         return
 
-    # --- 2. HANDLE CHECKOUT PENDING ---
+    # --- 2. HANDLE CHECKOUT PENDING (The state showing "Redirecting...") ---
     if st.session_state['checkout_status'] == 'pending_redirect':
-        st.info("✅ Processing order...") 
+        st.info("✅ Redirecting to external payment page (Simulated)...") 
+        
         time.sleep(1) 
         
-        try:
-            # 1. هات الحاجات اللي في السلة دلوقتي
-            cart_items = team5.view_cart(user_id)
-            
-            if cart_items:
-                # 2. احسب التوتال واسماء المنتجات عشان نحفظهم في الهيستوري
-                total_price = sum(item['salary'] * item['quantity'] for item in cart_items)
-                items_names = ", ".join([f"{item['name']} (x{item['quantity']})" for item in cart_items])
-                
-                # 3. احفظ الاوردر في الذاكرة (session_state)
-                new_order = {
-                    "id": int(time.time()), # رقم عشوائي للطلب بناء على الوقت
-                    "date": time.strftime("%Y-%m-%d"),
-                    "total": total_price,
-                    "status": "Processing ⏳",
-                    "items": items_names
-                }
-                # دي الخطوة اللي بتسمع في البروفايل
-                st.session_state['my_orders'].append(new_order) 
-
-                # 4. خصم المخزون (لو الدالة موجودة عندك)
-                # for item in cart_items:
-                #    db.update_product_stock(item['product_id'], item['quantity'])
-            
-            # 5. فضي السلة
-            team5.clear_cart(user_id) 
-            st.session_state['checkout_status'] = 'success'
-            st.rerun()
-
-        except Exception as e:
-            st.error(f"Error processing checkout: {e}")
+        # *** CRITICAL CHANGE: Use the transactional function ***
+        if user_id:
+            # This calls the function that updates stock AND clears the cart
+            if team5.process_order_and_update_stock(user_id):
+                st.session_state['checkout_status'] = 'success'
+            else:
+                # Stock error or DB transaction failure
+                st.error("Error processing order. Check stock levels or user login status and try again.")
+                st.session_state['checkout_status'] = 'idle' # Go back to idle state
+        else:
+            st.error("User ID not found. Cannot process order.")
             st.session_state['checkout_status'] = 'idle'
-            st.rerun()
+        
+        # Trigger the rerun to render the 'success' or error state
+        st.rerun()
         return
 
-    # --- 3. HANDLE IDLE (عرض السلة العادية) ---
+    # --- 3. HANDLE IDLE (Default cart display) ---
     if st.button("⬅️ Back to Shopping"):
         st.session_state['checkout_status'] = 'idle'
         go_to('home')
@@ -408,34 +372,47 @@ def render_cart():
         return
 
     total = 0
+
+    # Display Cart Items
     for item in items:
         with st.container(border=True):
             c1, c2, c3, c4 = st.columns([1, 2, 1, 1])
             with c1:
                 image_data_url = img_to_base64(item['image'])
                 if image_data_url:
-                    st.markdown(f"<img src='{image_data_url}' width='80' style='border-radius: 8px;'/>", unsafe_allow_html=True)
+                    st.markdown(
+                        f"<img src='{image_data_url}' width='80'/>",
+                        unsafe_allow_html=True
+                    )
                 else:
                     st.write("No Image")
+
             with c2:
                 st.subheader(item['name'])
                 st.caption(f"Qty: {item['quantity']}")
+                
+                # Simple check: Cart quantity vs current stock (User friendly warning)
+                if item.get('stock', 0) < item['quantity']:
+                    st.error(f"⚠️ **Stock Warning:** Only {item.get('stock', 0)} available!")
+
             with c3:
                 item_total = item['salary'] * item['quantity']
                 total += item_total
                 st.write(f"**{item_total} EGP**")
+
             with c4:
-                if st.button("Remove ❌", key=f"del_{item['id']}"):
-                    team5.remove_from_cart(item['id'])
+                # Use cart_item_id to remove the correct entry
+                if st.button("Remove ❌", key=f"del_{item['cart_item_id']}"): 
+                    team5.remove_from_cart(item['cart_item_id'])
                     st.rerun()
 
     st.divider()
     st.subheader(f"Total: {total} EGP")
 
-    if st.button("Checkout 💳"):
+    if st.button("Checkout 💳", type="primary"):
+        # Set the state to 'pending_redirect' and force a rerun
         st.session_state['checkout_status'] = 'pending_redirect'
         st.switch_page("pages/Payment.py")
-
 
 # ==========================================
 ## 🔑 Render Login/Signup Page (Simulated Redirect)
@@ -449,119 +426,115 @@ def render_login():
         Click the button below to **Login** or **Create a New Account** on our secure account portal.
     """)
     
-    # Simulate redirection to the external page
     if st.button("Go to Login/Sign Up Page ➡️", use_container_width=True, type="primary"):
         st.success("SIMULATED REDIRECT: Redirecting to your custom login page...")
         
-        # Simulating successful login back to the app immediately
         st.warning("Simulating successful login back to the app...")
-        login_user_simulated(user_id=1) # Logs in a user after the simulated external process
+        login_user_simulated(user_id=1)
         
 # ==========================================
-## 👤 Render Profile Page
+## 👤 Render Profile Page (FIXED)
 # ==========================================
+
 def render_profile():
     if st.button("⬅️ Back to Home"):
         go_to('home')
         
     st.title("👤 My Profile")
-    st.write("Manage your personal details and security settings.")
+    st.write("Manage your personal details, security settings, and view your order history.")
     st.divider()
 
     user_id = st.session_state.get('user_id')
+    
     if not user_id:
         st.error("You are not logged in.")
         return
 
-    # 1. جلب البيانات الحقيقية من الداتا بيز
-    current_user_data = team5.get_user_by_id(user_id)
+    # --- Simulated User Data ---
+    user_data = {
+        'id': user_id,
+        'name': 'Ahmed Salah' if user_id == 1 else 'New User', 
+        'password_mask': '********' 
+    }
     
-    if not current_user_data:
-        st.error("User not found in database.")
-        return
-
-    # عرض البيانات
+    # ==========================
+    # 1. Personal Details Section
+    # ==========================
     st.header("Personal Details")
-    st.markdown(f"**Current Name:** {current_user_data['username']}")
-    st.markdown(f"**Role:** {current_user_data['role']}")
+    st.markdown(f"**Name:** {user_data['name']}")
     
     st.subheader("Update Name")
     with st.form("update_name_form"):
-        new_name = st.text_input("New Name", value=current_user_data['username'])
-        
+        new_name = st.text_input("New Name", value=user_data['name'])
         if st.form_submit_button("Update Name"):
-            if new_name and new_name != current_user_data['username']:
-                # استدعاء دالة التحديث من db
-                if team5.update_username(user_id, new_name):
-                    st.success(f"Name updated successfully to: {new_name}")
-                    time.sleep(1) # استنى ثانية عشان اليوزر يشوف الرسالة
-                    st.rerun()    # اعمل ريفرش عشان الاسم الجديد يظهر
-                else:
-                    st.error("Username already exists, please choose another one.")
-            elif new_name == current_user_data['username']:
-                st.warning("No changes made to the name.")
+            st.success(f"Name updated successfully to: {new_name} (Simulated)")
             
     st.divider()
 
     # ==========================
-    # جزء المشتريات السابقة (زي ما هو)
+    # 2. Security Section 
     # ==========================
-    st.header("🛍️ Order History (طلباتي السابقة)")
-    my_orders = st.session_state.get('my_orders', [])
-
-    if my_orders:
-        for order in reversed(my_orders):
-            with st.container(border=True):
-                c1, c2 = st.columns([3, 1])
-                with c1:
-                    st.subheader(f"Order #{order['id']}")
-                    st.caption(f"Date: {order['date']}")
-                    st.write(f"**Items:** {order['items']}")
-                with c2:
-                    st.write(f"**{order['total']} EGP**")
-                    st.info(order['status'])
-    else:
-        st.info("No previous orders found yet.")
-    # ==========================
-
-    st.divider()
-
-    st.header("Security")
-    # بنعمل ماسك للباسورد عشان ميبانش
-    masked_pass = "*" * len(str(current_user_data['password']))
-    st.markdown(f"**Current Password:** {masked_pass}")
+    st.header("🔒 Security")
+    st.markdown(f"**Current Password:** {user_data['password_mask']}")
     
     st.subheader("Change Password")
     with st.form("change_password_form"):
-        current_password_input = st.text_input("Current Password", type="password")
+        current_password = st.text_input("Current Password", type="password")
         new_password = st.text_input("New Password", type="password")
         confirm_password = st.text_input("Confirm New Password", type="password")
         
         if st.form_submit_button("Change Password"):
-            # التأكد من الباسورد القديم
-            if current_password_input != current_user_data['password']:
-                st.error("Incorrect Current Password!")
-            elif new_password != confirm_password:
+            if new_password != confirm_password:
                 st.error("New Password and Confirmation Password do not match.")
-            elif len(new_password) < 4: # خليتها 4 للتسهيل
-                st.error("Password must be at least 4 characters.")
+            elif len(new_password) < 6:
+                st.error("Password must be at least 6 characters.")
             else:
-                # استدعاء دالة تحديث الباسورد من db
-                team5.update_password(user_id, new_password)
-                st.success("Password changed successfully!")
-                time.sleep(1)
-                st.rerun()
+                st.success("Password changed successfully! (Simulated)")
 
     st.divider()
+
+    # ==========================
+    # 3. Order History Section (IMPROVED DISPLAY WITH st.table)
+    # ==========================
+   # st.header("📦 Order History")
     
+   # history = team5.get_order_history(user_id)
+    
+   # if history:
+       # for order in history:
+            # Use an expander for better organization
+          #  with st.expander(f"Order **#{order['id']}** | Total: **{order['total']} EGP** | Status: **{order['status']}**", expanded=False):
+              #  st.caption(f"Date Placed: {order['date']}")
+                
+             #   st.markdown("##### Ordered Products:")
+                
+                # --- THIS PART USES st.table FOR CLEARER DISPLAY ---
+            #    order_data = []
+           #     for item in order['items']:
+          #          order_data.append([
+         #               item['name'],                   # Product Name
+        #                item['qty'],                    # Quantity Ordered
+       #                 f"{item['price']} EGP"          # Price at time of order
+      #              ])
+                
+     #           st.table([["Product Name", "Qty", "Price"]] + order_data) # Add header row
+                # ----------------------------------------------------
+                
+    #else:
+     #   st.info("You have no past orders.")
+    #    
+   # st.divider()
+    
+    # Logout button at the very bottom
     if st.button("➡️ **Logout**", use_container_width=True, type="primary"):
         logout_user()
+
 # ==========================================
-## ℹ️ Render About Us Page
+## ℹ️ Render About Us Page (UPDATED)
 # ==========================================
 
 def render_about():
-    st.title(" About RAWNAQ BRAND")
+    st.title("ℹ️ About RAWNAQ BRAND")
     st.write("---")
     
     st.header("Our Story and Vision")
@@ -584,8 +557,8 @@ def render_about():
     with col_contact1:
         st.subheader("📍 Contact Info")
         st.markdown("**📞 Phone:** +20 1022826895") 
-        st.markdown("**🏢 Address:** Menofiya, Egypt")
-        st.markdown("**📧 Email:** team@example.com")
+        st.markdown("**🏢 Address:** Cairo, Egypt")
+        st.markdown("**📧 Email:** team3@example.com")
         
     with col_contact2:
         st.subheader("📱 Social Media")
@@ -602,41 +575,44 @@ def render_about():
     # Team 3: Frontend & UI
     # ==========================
     with main_col1:
-      
+        
         
         t3_boys, t3_girls = st.columns(2)
         
         # 1. Boys Column
         with t3_boys:
-            st.markdown(" Boys staff")
+            st.markdown("Boys staff")
             st.markdown("""
             * [Ahmed helmy ]
             * [Ammar Yasser ]
             * [Abdelrhman Ashraf ]
-            * [Ahmed Mohammad ]
             * [Ahmed Saber ]
+            * [Ahmed Mohammad ]
             """)
             
         # 2. Girls Column
         with t3_girls:
-            st.markdown(" Girls staff")
+            st.markdown("Girls Staff")
             st.markdown("""
             * [Rokaya Alaa ]
-            * [Mariam Osama ]
+            * [Mariam Osama]
             * [Maya Seraj ]
             * [Lynah Adel ]
-            * [Walaa Magdy ]
+            * [Walaa Magdy]
             """)
             
     # ==========================
     # Team 5: Database & Backend (Placeholder)
     # ==========================
+    with main_col2:
+        st.info("💾 Team 5: Database & Backend") 
+        st.markdown("Details for Team 5 members go here.")
     
     st.divider()
     
     # Back button
     if st.button("⬅️ Back to Home"):
-        go_to('home')       
+        go_to('home')     
 
 # ==========================================
 
@@ -645,7 +621,7 @@ with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3081/3081559.png", width=100)
     st.title("Menu")
 
-    if st.button(" Home Page"):
+    if st.button("🏠 Home Page"):
         go_to('home')
 
     user_is_logged_in = st.session_state.get('user_id') is not None
@@ -655,11 +631,11 @@ with st.sidebar:
         if st.button("👤 My Profile"):
             go_to('profile')
 
+        cart_count = 0
         try:
-            # Get cart count dynamically
             cart_count = len(team5.view_cart(st.session_state['user_id']))
-        except:
-            cart_count = 0
+        except Exception as e:
+            pass 
             
         if st.button(f"🛒 My Cart ({cart_count})"):
             go_to('cart')
@@ -678,6 +654,7 @@ with st.sidebar:
     if st.button("ℹ️ About Us"):
         go_to('about')
 
+    
 
 # Page routing
 if st.session_state['page'] == 'home':
