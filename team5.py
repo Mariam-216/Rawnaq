@@ -1,4 +1,6 @@
 import sqlite3
+import pandas as pd
+from datetime import datetime
 
 DB_NAME = "database.db"
 
@@ -121,6 +123,7 @@ def get_all_products():
     return [dict(row) for row in products]
 
 
+
 # =============================================
 #   TEAM 3 FUNCTIONS (USER HOME + CART SYSTEM)
 # =============================================
@@ -156,20 +159,22 @@ def add_to_cart(user_id, product_id, quantity=1):
 
 
 def view_cart(user_id):
-
-    # VIEW CART PRODUCTS (Modified to return product_id)
-
+    # VIEW CART PRODUCTS
     conn = get_connection()
-
     query = """
-             SELECT cart.id, cart.product_id, products.name, products.salary, cart.quantity, products.image
+             SELECT cart.id AS cart_item_id, products.id AS product_id, products.name, 
+                    products.salary, products.image, cart.quantity, products.stock
              FROM cart
-                      JOIN products ON cart.product_id = products.id
+             JOIN products ON cart.product_id = products.id
              WHERE cart.user_id = ? 
              """
     items = conn.execute(query, (user_id,)).fetchall()
     conn.close()
+    # Ensure items are returned as a list of dictionaries
     return [dict(row) for row in items]
+
+    # VIEW CART PRODUCTS (Modified to return product_id)
+
 
 
 def remove_from_cart(cart_id):
@@ -183,16 +188,68 @@ def remove_from_cart(cart_id):
 
 # --- NEW FUNCTIONS FOR CHECKOUT/STOCK MANAGEMENT ---
 
-def update_product_stock(product_id, quantity_to_subtract):
-    """Safely decrements the stock for a given product ID by the purchased quantity."""
+def process_order_and_update_stock(user_id):
+    """
+    Handles the entire checkout transaction:
+    1. Gets all items in the user's cart.
+    2. Decrements the stock for each product.
+    3. Clears the cart.
+    Uses a transaction to ensure atomicity.
+    """
     conn = get_connection()
-    # Ensure stock doesn't go below zero (though cart validation should prevent this)
-    conn.execute(
-        "UPDATE products SET stock = MAX(0, stock - ?) WHERE id = ?",
-        (quantity_to_subtract, product_id)
-    )
-    conn.commit()
-    conn.close()
+    cursor = conn.cursor()
+    
+    # 1. Get cart items including product_id and quantity
+    cart_items = cursor.execute("""
+        SELECT product_id, quantity 
+        FROM cart 
+        WHERE user_id = ?
+    """, (user_id,)).fetchall()
+    
+    try:
+        # Check for sufficient stock before starting the transaction
+        for item in cart_items:
+            stock_check = cursor.execute(
+                "SELECT stock FROM products WHERE id = ?", (item['product_id'],)
+            ).fetchone()
+            
+            # Check if stock is available
+            if stock_check and stock_check['stock'] < item['quantity']:
+                raise ValueError(f"Insufficient stock for product ID {item['product_id']}")
+
+        # 2. Update stock for each item (only runs if stock check passed)
+        for item in cart_items:
+            product_id = item['product_id']
+            quantity = item['quantity']
+            
+            # Decrement the stock in the products table
+            cursor.execute("""
+                UPDATE products 
+                SET stock = stock - ? 
+                WHERE id = ?
+            """, (quantity, product_id))
+
+        # 3. Clear the cart
+        cursor.execute("DELETE FROM cart WHERE user_id=?", (user_id,))
+        
+        # Commit the transaction (all changes saved at once)
+        conn.commit()
+        return True
+    
+    except ValueError as ve:
+        # Handle custom stock errors
+        conn.rollback()
+        print(f"Checkout Failed: {ve}")
+        return False
+    except Exception as e:
+        # If any other error occurs, rollback the changes
+        conn.rollback()
+        print(f"Critical Transaction Failed: {e}")
+        return False
+        
+    finally:
+        conn.commit()
+        conn.close()
     
 def clear_cart(user_id):
     """Removes all items from a user's cart after a successful checkout."""
